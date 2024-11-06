@@ -1,0 +1,66 @@
+---
+- name: Install and configure Grafana and Prometheus on Rocky Linux 9
+  hosts: grafana
+  become: yes
+  tasks:
+    - name: Ensure EPEL repository is installed
+      dnf:
+        name: epel-release
+        state: present
+
+    - name: Install dependencies for Grafana and Prometheus
+      dnf:
+        name:
+          - wget
+          - sudo
+        state: present
+
+    - name: Add Grafana repository
+      copy:
+        dest: /etc/yum.repos.d/grafana.repo
+        content: |
+          [grafana]
+          name=grafana
+          baseurl=https://packages.grafana.com/oss/rpm
+          enabled=1
+          gpgcheck=1
+          gpgkey=https://packages.grafana.com/gpg.key
+        mode: '0644'
+
+    - name: Install Grafana
+      dnf:
+        name: grafana
+        state: present
+
+    - name: Enable and start Grafana service
+      service:
+        name: grafana-server
+          #enabled: yes  -- rhel ma jakiś problem z tym i nie można dać enable nawet manualnie
+        state: started
+
+    - name: Open port 3000 for Grafana
+      firewalld:
+        port: 3000/tcp
+        permanent: yes
+        state: enabled
+        immediate: yes
+
+    - name: permit traffic in default zone for https service
+      ansible.posix.firewalld:
+        service: http
+        permanent: true
+        state: enabled
+
+    - name: Reload firewalld to apply changes
+      service:
+        name: firewalld
+        state: reloaded
+          #immediate: yes
+
+    - name: Ensure Grafana are running
+      service:
+        name: "{{ item }}"
+        state: started
+          #enabled: yes
+      loop:
+        - grafana-server

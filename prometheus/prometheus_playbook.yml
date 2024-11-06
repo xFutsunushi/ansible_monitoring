@@ -1,0 +1,6 @@
+---
+- hosts: grafana
+  become: True  
+  gather_facts: yes
+  roles:
+    - role: '/root/prometheus'

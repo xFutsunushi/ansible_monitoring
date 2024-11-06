@@ -1,0 +1,12 @@
+--- #play example
+- hosts: localhost
+  become: true
+  tasks:
+    - name: install software
+      yum:
+        name: vim
+        state: latest
+    - name: install more software
+      yum:
+        name: nmap
+        state: latest

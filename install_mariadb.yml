@@ -1,0 +1,80 @@
+---
+- name: Instalacja i konfiguracja MariaDB 10.11 na systemie RHEL
+  hosts: dbservers
+  become: yes
+  vars:
+    mariadb_version: "10.11"
+    mariadb_root_password: "swiezy777"  # Ustaw hasło dla użytkownika root
+    bind_address: "0.0.0.0"  # Ustaw 127.0.0.1, jeśli chcesz ograniczyć dostęp tylko do lokalnego hosta
+
+  tasks:
+    - name: Zainstaluj zależności Python dla MariaDB
+      yum:
+        name: python3-PyMySQL
+        state: present
+
+    - name: Dodaj repozytorium MariaDB
+      yum_repository:
+        name: MariaDB
+        description: "MariaDB Repository"
+        baseurl: "http://yum.mariadb.org/{{ mariadb_version }}/rhel/$releasever/$basearch"
+        gpgkey: https://mariadb.org/mariadb_release_signing_key.asc
+        gpgcheck: yes
+        enabled: yes
+
+    - name: Zainstaluj MariaDB Server
+      yum:
+        name: MariaDB-server
+        state: present
+
+    - name: Uruchom i włącz MariaDB przy starcie systemu
+      systemd:
+        name: mariadb
+        state: started
+        enabled: yes
+
+    - name: Ustawienie hasła root dla MariaDB
+      mysql_user:
+        name: root
+        host: "localhost"
+        password: "{{ mariadb_root_password }}"
+        login_unix_socket: /var/lib/mysql/mysql.sock
+        check_implicit_admin: yes
+
+    - name: Skonfiguruj bind-address w pliku my.cnf
+      lineinfile:
+        path: /etc/my.cnf.d/server.cnf
+        regexp: '^bind-address'
+        line: "bind-address = {{ bind_address }}"
+        state: present
+      notify: Restart MariaDB
+
+    - name: Usuń anonimowych użytkowników
+      mysql_user:
+        name: ''
+        host_all: yes
+        state: absent
+        login_user: root
+        login_password: "{{ mariadb_root_password }}"
+
+    - name: Usuń bazę testową
+      mysql_db:
+        name: test
+        state: absent
+        login_user: root
+        login_password: "{{ mariadb_root_password }}"
+
+    - name: Zablokuj zdalne logowanie dla użytkownika root
+      mysql_user:
+        name: root
+        host: '%'
+        state: absent
+        login_user: root
+        login_password: "{{ mariadb_root_password }}"
+
+  handlers:
+    - name: Restart MariaDB
+      service:
+        name: mariadb
+        state: restarted
+
