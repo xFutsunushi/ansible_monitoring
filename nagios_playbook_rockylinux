@@ -1,0 +1,163 @@
+---
+- name: Install Nagios on Rocky Linux 9
+  hosts: nagios
+  become: true
+
+  vars:
+    nagios_version: "4.4.6"
+    nagios_plugins_version: "2.3.3"
+    nagios_user: "nagios"
+    nagios_group: "nagios"
+    apache_user: "apache"
+
+  tasks:
+    - name: Update dnf cache
+      dnf:
+        update_cache: yes
+
+    - name: Install dependencies
+      dnf:
+        name:
+          - tar
+          - wget
+          - gcc
+          - glibc
+          - glibc-common
+          - gd
+          - gd-devel
+          - make
+          - net-snmp
+          - openssl-devel
+          - php
+          - perl
+          - httpd
+          - httpd-tools
+          - unzip
+          - libpng
+          - libpng-devel
+          - libjpeg
+          - libjpeg-devel
+        state: present
+
+    - name: Create Nagios user and group
+      user:
+        name: "{{ nagios_user }}"
+        #group: "{{ nagios_group }}"
+        create_home: no
+        shell: /sbin/nologin
+
+    - name: Create nagios group
+      group:
+        name: nagios
+        state: present
+
+    - name: Download Nagios
+      get_url:
+        url: "https://assets.nagios.com/downloads/nagioscore/releases/nagios-{{ nagios_version }}.tar.gz"
+        dest: "/tmp/nagios-{{ nagios_version }}.tar.gz"
+
+    - name: Extract Nagios
+      unarchive:
+        src: "/tmp/nagios-{{ nagios_version }}.tar.gz"
+        dest: "/tmp"
+        remote_src: yes
+
+    - name: Compile and install Nagios
+      shell: |
+        cd /tmp/nagios-{{ nagios_version }}
+        ./configure --with-httpd-conf=/etc/httpd/conf.d
+        make all
+        make install-groups-users
+        usermod -a -G {{ apache_user }} {{ nagios_user }}
+        make install
+        make install-daemoninit
+        make install-commandmode
+        make install-config
+        make install-webconf
+      args:
+        creates: "/usr/local/nagios/bin/nagios"
+
+    - name: Download Nagios Plugins
+      get_url:
+        url: "https://nagios-plugins.org/download/nagios-plugins-{{ nagios_plugins_version }}.tar.gz"
+        dest: "/tmp/nagios-plugins-{{ nagios_plugins_version }}.tar.gz"
+
+    - name: Extract Nagios Plugins
+      unarchive:
+        src: "/tmp/nagios-plugins-{{ nagios_plugins_version }}.tar.gz"
+        dest: "/tmp"
+        remote_src: yes
+
+    - name: Compile and install Nagios Plugins
+      shell: |
+        cd /tmp/nagios-plugins-{{ nagios_plugins_version }}
+        ./configure --with-nagios-user={{ nagios_user }} --with-nagios-group={{ nagios_group }}
+        make
+        make install
+      args:
+        creates: "/usr/local/nagios/libexec/check_ping"
+
+    - name: Enable Apache CGI module
+      #apache2_module:
+      #  name: cgid
+      #  state: present
+      shell: |
+        echo "LoadModule cgi_module modules/mod_cgi.so" >> /etc/httpd/conf.modules.d/00-base.conf
+        #when: "'cgi' not in ansible_facts.packages"
+      #blockinfile:
+      #  path: /etc/httpd/conf.modules.d/00-base.conf
+      #  block: |
+      #    LoadModule cgi_module modules/mod_cgi.so
+      #  notify: Restart Apache
+
+    - name: Set up Nagios web interface password
+      command: htpasswd -bc /usr/local/nagios/etc/htpasswd.users nagiosadmin swiezy777
+
+    - name: Start and enable Apache
+      service:
+        name: httpd
+        state: restarted
+        enabled: yes
+
+    - name: Start and enable Nagios service
+      service:
+        name: nagios
+        state: started
+        enabled: yes
+
+    - name: Ensure firewalld is installed and running
+      dnf:
+        name: firewalld
+        state: present
+
+    - name: Start and enable firewalld
+      service:
+        name: firewalld
+        state: started
+        enabled: yes
+
+    - name: Open HTTP port 80 in firewall
+      firewalld:
+        port: 80/tcp
+        permanent: true
+        state: enabled
+        immediate: yes
+
+    - name: Open HTTPS port 443 in firewall
+      firewalld:
+        port: 443/tcp
+        permanent: true
+        state: enabled
+        immediate: yes
+
+    - name: Reload firewalld to apply changes
+      service:
+        name: firewalld
+        state: reloaded
+
+  handlers:
+    - name: Restart Apache
+      service:
+        name: httpd
+        state: restarted
+        listen: "restart apache"
