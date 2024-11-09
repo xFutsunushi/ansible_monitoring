@@ -1,0 +1,35 @@
+- name: Set up VM parameters for master
+  set_fact:
+    vm_name: "kvm1"
+    vm_memory: 2048
+    vm_vcpu: 2
+
+- name: Define master VM
+  virt:
+    command: define
+    xml: "{{ lookup('template', 'vm_template.xml.j2') }}"
+    uri: 'qemu:///system'
+
+- name: Start master VM
+  virt:
+    name: kvm1
+    state: running
+    uri: 'qemu:///system'
+
+- name: Set up VM parameters for replica
+  set_fact:
+    vm_name: "kvm2"
+    vm_memory: 2048
+    vm_vcpu: 2
+
+- name: Define replica VM
+  virt:
+    command: define
+    xml: "{{ lookup('template', 'vm_template.xml.j2') }}"
+    uri: 'qemu:///system'
+
+- name: Start replica VM
+  virt:
+    name: kvm2
+    state: running
+    uri: 'qemu:///system'

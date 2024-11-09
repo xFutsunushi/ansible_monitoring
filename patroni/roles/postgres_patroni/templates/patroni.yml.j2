@@ -1,0 +1,33 @@
+scope: postgres-cluster
+namespace: /service/
+name: {{ inventory_hostname }}
+
+restapi:
+  listen: {{ ansible_default_ipv4.address }}:8008
+  connect_address: {{ ansible_default_ipv4.address }}:8008
+
+etcd:
+  hosts: <IP_ETCD>:2379
+
+bootstrap:
+  dcs:
+    postgresql:
+      parameters:
+        max_connections: 100
+  initdb:
+    - encoding: UTF8
+    - data-checksums
+
+postgresql:
+  listen: {{ ansible_default_ipv4.address }}:5432
+  connect_address: {{ ansible_default_ipv4.address }}:5432
+  data_dir: /var/lib/postgresql/12/main
+  bin_dir: /usr/lib/postgresql/12/bin
+  authentication:
+    replication:
+      username: replicator
+      password: rep_password
+    superuser:
+      username: postgres
+      password: postgres_password
+

@@ -1,0 +1,28 @@
+---
+- name: Install dependencies
+  apt:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - postgresql
+    - python3-psycopg2
+    - etcd
+    - patroni
+
+- name: Configure PostgreSQL
+  template:
+    src: postgresql.conf.j2
+    dest: /etc/postgresql/12/main/postgresql.conf
+  notify: Restart PostgreSQL
+
+- name: Configure Patroni
+  template:
+    src: patroni.yml.j2
+    dest: /etc/patroni.yml
+
+- name: Enable and start Patroni
+  systemd:
+    name: patroni
+    enabled: yes
+    state: started
+

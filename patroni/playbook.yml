@@ -1,0 +1,13 @@
+- name: Provision KVM VMs
+  hosts: 172.28.20.49
+  roles:
+    - kvm_vm
+
+- name: Install lxml on remote host
+  hosts: all
+  become: true
+  tasks:
+    - name: Install Python lxml package
+      ansible.builtin.package:
+        name: python3-lxml
+        state: present
