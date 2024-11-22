@@ -1,0 +1,34 @@
+---
+- name: Install Apache2
+  hosts: webservers
+  become: true
+  tasks:
+    - name: Gather installed package facts
+      package_facts:
+        manager: auto
+
+    - name: Check if python3-dnf or equivalent is installed
+      debug:
+        msg: "python3-dnf is installed"
+      when: "'python3-dnf' in ansible_facts.packages"
+
+    - name: Install python3-dnf if not installed
+      dnf:
+        name: python3-dnf
+        state: present
+      when: "'python3-dnf' not in ansible_facts.packages"
+
+    - name: Update package cache
+      yum:
+        update_cache: yes
+
+    - name: Install Apache2 package
+      yum:
+        name: httpd
+        state: present
+
+    - name: Enable and start Apache2 service
+      systemd:
+        name: httpd
+        enabled: true
+        state: started
